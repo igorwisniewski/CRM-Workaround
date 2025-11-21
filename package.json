@@ -1,0 +1,41 @@
+{
+  "name": "untitled36",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "eslint",
+    "prisma:dev": "npx dotenv -e .env.local -- npx prisma migrate dev",
+    "prisma:generate": "npx dotenv -e .env.local -- npx prisma generate",
+    "prisma:studio": "npx dotenv -e .env.local -- npx prisma studio",
+    "prisma:push": "npx dotenv -e .env.local -- npx prisma db push"
+  },
+  "dependencies": {
+    "@fullcalendar/daygrid": "^6.1.19",
+    "@fullcalendar/interaction": "^6.1.19",
+    "@fullcalendar/react": "^6.1.19",
+    "prisma": "6.18.0",
+    "@fullcalendar/timegrid": "^6.1.19",
+    "@prisma/client": "^6.18.0",
+    "@supabase/ssr": "^0.7.0",
+    "dotenv": "^17.2.3",
+    "next": "16.0.1",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "babel-plugin-react-compiler": "1.0.0",
+    "dotenv-cli": "^11.0.0",
+    "eslint": "^9",
+    "eslint-config-next": "16.0.1",
+    "prisma": "^6.18.0",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
