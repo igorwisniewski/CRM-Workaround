@@ -1,41 +1,31 @@
-// src/app/api/contact-details/[id]/route.ts
-import { NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
+import { NextResponse, type NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/auth'
 
-// Ta sama funkcja-workaround co w API kontaktów
-function getIdFromUrl(request: Request) {
-    const url = new URL(request.url)
-    const pathParts = url.pathname.split('/')
-    const id = pathParts[pathParts.length - 1]
-    return id
-}
-
-export async function GET(request: Request) {
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const session = await auth()
+    if (!session?.user?.email) {
         return NextResponse.json({ error: 'Brak autoryzacji' }, { status: 401 })
     }
 
     try {
-        const contactId = getIdFromUrl(request)
-        if (!contactId) {
+        const { id } = await params
+        if (!id) {
             return NextResponse.json({ error: 'Brak ID w adresie URL' }, { status: 400 });
         }
 
         // 1. Pobierz kontakt
         const contact = await prisma.contact.findUnique({
-            where: { id: contactId }
+            where: { id: id }
         })
 
         if (!contact) {
             return NextResponse.json({ error: 'Nie znaleziono kontaktu' }, { status: 404 });
         }
 
-        // 2. Pobierz zadania (z kolorem i mailem usera)
+        // 2. Pobierz zadania
         const tasks = await prisma.task.findMany({
-            where: { contactId: contactId },
+            where: { contactId: id },
             include: {
                 assignedTo: {
                     select: { email: true, kolor: true }
@@ -44,12 +34,11 @@ export async function GET(request: Request) {
             orderBy: { termin: 'asc' }
         })
 
-        // 3. Pobierz listę userów (dla formularza)
+        // 3. Pobierz listę userów (do przypisywania)
         const users = await prisma.user.findMany({
             select: { id: true, email: true }
         })
 
-        // Zwróć wszystko jako jeden obiekt
         return NextResponse.json({ contact, tasks, users });
 
     } catch (error: any) {

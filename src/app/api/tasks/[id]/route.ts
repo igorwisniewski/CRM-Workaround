@@ -1,42 +1,30 @@
-// src/app/api/tasks/[id]/route.ts
-import { NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
+import { NextResponse, type NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/auth'
 
-// Funkcja do ręcznego pobrania ID z URL (workaround)
-function getIdFromUrl(request: Request) {
-    const url = new URL(request.url)
-    const pathParts = url.pathname.split('/')
-    const id = pathParts[pathParts.length - 1]
-    return id
-}
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const session = await auth()
 
-export async function DELETE(request: Request) {
-    const supabase = createClient()
+    if (!session?.user?.email) {
+        return NextResponse.json({ error: 'Brak autoryzacji' }, { status: 401 })
+    }
 
     try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
-            // Sprawdzamy tylko, czy ktoś jest zalogowany
-            return NextResponse.json({ error: 'Brak autoryzacji' }, { status: 401 })
+        const { id } = await params
+        if (!id) {
+            return NextResponse.json({ error: 'Brak ID zadania' }, { status: 400 });
         }
 
-        const taskId = getIdFromUrl(request)
-        if (!taskId) {
-            return NextResponse.json({ error: 'Brak ID zadania w adresie URL' }, { status: 400 });
-        }
-
-        // Usuwamy zadanie bez sprawdzania roli
         await prisma.task.delete({
-            where: { id: taskId },
+            where: { id: id },
         })
 
         return NextResponse.json({ message: 'Usunięto zadanie' }, { status: 200 })
 
     } catch (error: any) {
-        console.error("Błąd podczas usuwania zadania:", error)
-        if (error.code === 'P2025') { // Kod błędu Prismy, gdy rekord nie istnieje
-            return NextResponse.json({ error: 'Nie znaleziono zadania do usunięcia' }, { status: 404 })
+        console.error("Błąd usuwania zadania:", error)
+        if (error.code === 'P2025') {
+            return NextResponse.json({ error: 'Zadanie nie istnieje' }, { status: 404 })
         }
         return NextResponse.json({ error: error.message }, { status: 500 })
     }

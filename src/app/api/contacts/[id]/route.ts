@@ -1,24 +1,18 @@
-// src/app/api/contacts/[id]/route.ts
-
-// ZMIANA: Usunięto 'export const dynamic = 'force-dynamic'' - nie jest tu konieczne
 import { NextResponse, type NextRequest } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/auth'
 
-// --- POBIERANIE 1 KONTAKTU (dla strony edycji) ---
-// Poprawna sygnatura funkcji dla App Routera z Promise dla params
+// --- POBIERANIE 1 KONTAKTU ---
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
+    const session = await auth()
+    if (!session?.user?.email) {
         return NextResponse.json({ error: 'Brak autoryzacji' }, { status: 401 })
     }
 
     try {
-        // ZMIANA: Używamy 'await params', aby dostać się do id
         const { id } = await params
         if (!id) {
-            return NextResponse.json({ error: 'Brak ID w adresie URL' }, { status: 400 });
+            return NextResponse.json({ error: 'Brak ID' }, { status: 400 });
         }
 
         const contact = await prisma.contact.findUnique({
@@ -36,22 +30,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 // --- AKTUALIZACJA 1 KONTAKTU ---
-// Poprawna sygnatura funkcji
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
+    const session = await auth()
+    if (!session?.user?.email) {
         return NextResponse.json({ error: 'Brak autoryzacji' }, { status: 401 })
     }
 
     try {
-        // ZMIANA: Używamy 'await params'
         const { id } = await params
-        if (!id) {
-            return NextResponse.json({ error: 'Brak ID w adresie URL' }, { status: 400 });
-        }
-
         const body = await request.json()
+
         const updatedContact = await prisma.contact.update({
             where: { id: id },
             data: body,
@@ -62,47 +50,32 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 }
 
-// Poprawna sygnatura funkcji
+// --- USUWANIE KONTAKTU ---
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
+    const session = await auth()
+    if (!session?.user?.email) {
         return NextResponse.json({ error: 'Brak autoryzacji' }, { status: 401 })
     }
 
-    const userProfile = await prisma.user.findUnique({ where: { id: user.id }})
+    // Sprawdzenie roli ADMIN
+    const userProfile = await prisma.user.findUnique({ where: { email: session.user.email }})
     if (userProfile?.role !== 'ADMIN') {
         return NextResponse.json({ error: 'Brak uprawnień Admina' }, { status: 403 })
     }
 
     try {
-        // ZMIANA: Używamy 'await params'
         const { id } = await params
-        if (!id) {
-            return NextResponse.json({ error: 'Brak ID w adresie URL' }, { status: 400 });
-        }
 
-        // Transakcja usuwania zadań i kontaktu
-        const deleteTasks = prisma.task.deleteMany({
-            where: { contactId: id },
-        })
-
-        const deleteContact = prisma.contact.delete({
-            where: { id: id },
-        })
-
+        // Transakcja usuwania
         await prisma.$transaction([
-            deleteTasks,
-            deleteContact
+            prisma.task.deleteMany({ where: { contactId: id } }),
+            prisma.contact.delete({ where: { id: id } })
         ])
 
         return NextResponse.json({ message: 'Usunięto' }, { status: 200 })
 
     } catch (error: any) {
-        console.error("Błąd podczas usuwania kontaktu:", error)
-        if (error.code) {
-            return NextResponse.json({ error: `Błąd Prismy ${error.code}: ${error.message}` }, { status: 500 })
-        }
+        console.error("Błąd usuwania:", error)
         return NextResponse.json({ error: error.message }, { status: 500 })
     }
 }

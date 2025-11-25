@@ -1,17 +1,15 @@
-// src/app/api/form-data/route.ts
 import { NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/auth'
 
 export async function GET(request: Request) {
-    const supabase = createClient()
-    try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
-            return NextResponse.json({ error: 'Brak autoryzacji' }, { status: 401 })
-        }
+    const session = await auth()
 
-        // Pobieramy obie listy naraz
+    if (!session?.user?.email) {
+        return NextResponse.json({ error: 'Brak autoryzacji' }, { status: 401 })
+    }
+
+    try {
         const [users, contacts] = await Promise.all([
             prisma.user.findMany({
                 select: { id: true, email: true }

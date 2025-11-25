@@ -1,14 +1,14 @@
+// src/app/api/users/route.ts
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { createClient } from '@/utils/supabase/server'
+import { auth } from '@/auth' // <--- ZMIANA: Importujemy auth z NextAuth
 
 // Funkcja GET do pobierania listy użytkowników
 export async function GET() {
-    const supabase = createClient()
+    // 1. Sprawdzamy, czy użytkownik jest zalogowany przy użyciu NextAuth
+    const session = await auth()
 
-    // Sprawdzamy, czy użytkownik jest zalogowany
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
+    if (!session?.user?.email) {
         return NextResponse.json({ error: 'Brak autoryzacji' }, { status: 401 })
     }
 

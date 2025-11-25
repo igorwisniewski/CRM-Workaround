@@ -1,27 +1,27 @@
-// src/app/ustawienia/page.tsx
 import { prisma } from '@/lib/prisma'
-import { createClient } from '@/utils/supabase/server'
+import { auth } from '@/auth' // <--- ZMIANA: Import auth
 import { redirect } from 'next/navigation'
-import UserColorPicker from '@/components/UserColorPicker' // Importujemy nasz komponent
+import UserColorPicker from '@/components/UserColorPicker'
 
 export default async function UstawieniaPage() {
-    const supabase = createClient()
+    // 1. Pobierz sesję
+    const session = await auth()
 
-    // 1. Sprawdź, czy to Admin
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
+    if (!session?.user?.email) {
         redirect('/login')
     }
 
+    // 2. Sprawdź rolę w bazie
     const userProfile = await prisma.user.findUnique({
-        where: { id: user.id }
+        where: { email: session.user.email }
     })
+
     if (userProfile?.role !== 'ADMIN') {
-        // Jeśli to nie admin, przekieruj
+        // Jeśli to nie admin, przekieruj do kontaktów
         redirect('/kontakty')
     }
 
-    // 2. Pobierz wszystkich użytkowników
+    // 3. Pobierz wszystkich użytkowników
     const allUsers = await prisma.user.findMany({
         orderBy: { email: 'asc' }
     })
@@ -35,6 +35,9 @@ export default async function UstawieniaPage() {
                 {allUsers.map(user => (
                     <div key={user.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', border: '1px solid #ddd' }}>
                         <strong>{user.email}</strong>
+                        {/* UserColorPicker to komponent kliencki (use client),
+                            więc możemy mu przekazać dane usera jako propsy.
+                            Upewnij się tylko, że UserColorPicker nie importuje Supabase. */}
                         <UserColorPicker user={user} />
                     </div>
                 ))}

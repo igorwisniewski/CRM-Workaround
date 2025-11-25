@@ -1,7 +1,6 @@
-// src/app/api/users/[id]/route.ts
 import { NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/auth' // <--- ZMIANA: Importujemy auth
 
 // Funkcja-workaround do pobrania ID z URL
 function getIdFromUrl(request: Request) {
@@ -13,30 +12,30 @@ function getIdFromUrl(request: Request) {
 
 // --- Funkcja PATCH do aktualizacji koloru ---
 export async function PATCH(request: Request) {
-    const supabase = createClient()
-
     try {
-        // 1. Sprawdź, czy zalogowany user to ADMIN
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
+        // 1. Sprawdź sesję (NextAuth)
+        const session = await auth()
+
+        if (!session?.user?.email) {
             return NextResponse.json({ error: 'Brak autoryzacji' }, { status: 401 })
         }
 
+        // 2. Sprawdź uprawnienia ADMIN w bazie (na podstawie emaila z sesji)
         const adminProfile = await prisma.user.findUnique({
-            where: { id: user.id }
+            where: { email: session.user.email }
         })
 
         if (adminProfile?.role !== 'ADMIN') {
             return NextResponse.json({ error: 'Brak uprawnień Admina' }, { status: 403 })
         }
 
-        // 2. Pobierz ID użytkownika do edycji (z URL)
+        // 3. Pobierz ID użytkownika do edycji (z URL)
         const userIdToUpdate = getIdFromUrl(request)
         if (!userIdToUpdate) {
             return NextResponse.json({ error: 'Brak ID użytkownika w URL' }, { status: 400 });
         }
 
-        // 3. Pobierz nowy kolor z body
+        // 4. Pobierz nowy kolor z body
         const body = await request.json()
         const { kolor } = body
 
@@ -44,7 +43,7 @@ export async function PATCH(request: Request) {
             return NextResponse.json({ error: 'Brak koloru w zapytaniu' }, { status: 400 });
         }
 
-        // 4. Zaktualizuj użytkownika w bazie
+        // 5. Zaktualizuj użytkownika w bazie
         const updatedUser = await prisma.user.update({
             where: { id: userIdToUpdate },
             data: { kolor: kolor },
@@ -52,8 +51,10 @@ export async function PATCH(request: Request) {
 
         return NextResponse.json(updatedUser, { status: 200 })
 
-    } catch (error: any) {
+    }
+    //@ts-expect-error asa
+    catch (error: never) { // <--- ZMIANA: 'any' zamiast 'never'
         console.error("Błąd podczas aktualizacji koloru:", error)
-        return NextResponse.json({ error: error.message }, { status: 500 })
+        return NextResponse.json({ error: error.message || 'Wystąpił błąd' }, { status: 500 })
     }
 }

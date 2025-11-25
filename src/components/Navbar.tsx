@@ -1,10 +1,9 @@
 // src/components/Navbar.tsx
 import Link from 'next/link'
-import { createClient } from '@/utils/supabase/server'
-import { prisma } from '@/lib/prisma' // <-- 1. IMPORTUJEMY PRISMA
+import { auth } from '@/auth' // Importujemy nową funkcję autoryzacji
+import { prisma } from '@/lib/prisma'
 import LogoutButton from '@/components/LogoutButton'
 
-// ... (style bez zmian) ...
 const navStyle = {
     display: 'flex',
     alignItems: 'center',
@@ -28,21 +27,21 @@ const userEmailStyle = {
     fontSize: '0.9rem',
     color: '#ccc',
 };
-// ... (style bez zmian) ...
-
 
 export default async function Navbar() {
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    // 1. Pobieramy sesję z NextAuth
+    const session = await auth()
+    const user = session?.user
 
-    if (!user) {
+    if (!user || !user.email) {
         return null
     }
 
-    // 2. SPRAWDZAMY ROLĘ UŻYTKOWNIKA
+    // 2. Pobieramy rolę z bazy (opcjonalne, jeśli rola nie jest w sesji)
+    // Uwaga: user.id z sesji może wymagać rozszerzenia typów, ale email jest zawsze
     const userProfile = await prisma.user.findUnique({
-        where: { id: user.id },
-        select: { role: true } // Pobieramy tylko rolę
+        where: { email: user.email },
+        select: { role: true }
     })
 
     return (
@@ -58,7 +57,7 @@ export default async function Navbar() {
                     Kalendarz
                 </Link>
 
-                {/* 3. LINK WIDOCZNY TYLKO DLA ADMINA */}
+                {/* 3. Link widoczny tylko dla ADMINA */}
                 {userProfile?.role === 'ADMIN' && (
                     <Link href="/ustawienia" style={linkStyle}>
                         Ustawienia

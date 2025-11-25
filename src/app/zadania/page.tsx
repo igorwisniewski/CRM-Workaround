@@ -4,11 +4,11 @@
 export const dynamic = 'force-dynamic'
 
 import { prisma } from '@/lib/prisma'
-import { createClient } from '@/utils/supabase/server'
+import { auth } from '@/auth' // Importujemy NextAuth
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Prisma } from '@prisma/client'
-import ZadaniaFiltry from '@/components/ZadaniaFiltry' // Nasz nowy filtr
+import ZadaniaFiltry from '@/components/ZadaniaFiltry'
 
 // Definicja propsów dla strony
 interface ZadaniaPageProps {
@@ -26,18 +26,18 @@ function formatTermin(date: Date) {
 }
 
 export default async function ZadaniaPage({ searchParams }: ZadaniaPageProps) {
-    const supabase = createClient()
+    // 1. Uwierzytelnianie (NextAuth)
+    const session = await auth()
 
-    // 1. Uwierzytelnianie
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
+    if (!session?.user?.email) {
         redirect('/login')
     }
 
-    // Pobieramy profil zalogowanego użytkownika (dla roli i ID)
+    // Pobieramy profil zalogowanego użytkownika z bazy (dla roli i ID)
     const userProfile = await prisma.user.findUnique({
-        where: { id: user.id }
+        where: { email: session.user.email }
     })
+
     if (!userProfile) {
         redirect('/login')
     }
@@ -111,8 +111,8 @@ export default async function ZadaniaPage({ searchParams }: ZadaniaPageProps) {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <strong style={{ fontSize: '1.2rem' }}>{task.nazwa}</strong>
                             <span style={{ fontWeight: 'bold', color: 'red' }}>
-                Termin: {formatTermin(task.termin)}
-              </span>
+                                Termin: {formatTermin(task.termin)}
+                            </span>
                         </div>
 
                         <p style={{ margin: '10px 0' }}>{task.opis}</p>
@@ -128,8 +128,8 @@ export default async function ZadaniaPage({ searchParams }: ZadaniaPageProps) {
                                 color: 'white',
                                 background: task.assignedTo.kolor || '#808080'
                             }}>
-                {task.assignedTo.email}
-              </span>
+                                {task.assignedTo.email}
+                            </span>
                         </div>
                     </div>
                 ))}

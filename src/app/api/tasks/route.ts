@@ -1,21 +1,31 @@
 // src/app/api/tasks/route.ts
 import { NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
 import { prisma } from '@/lib/prisma'
-export async function GET(request: Request) {
-    const supabase = createClient()
+import { auth } from '@/auth' // <--- ZMIANA: Importujemy auth
 
+export async function GET(request: Request) {
     try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
+        // 1. Sprawdź sesję
+        const session = await auth()
+
+        if (!session?.user?.email) {
             return NextResponse.json({ error: 'Brak autoryzacji' }, { status: 401 })
+        }
+
+        // 2. Pobierz ID użytkownika z bazy na podstawie maila
+        const user = await prisma.user.findUnique({
+            where: { email: session.user.email }
+        })
+
+        if (!user) {
+            return NextResponse.json({ error: 'Nie znaleziono użytkownika' }, { status: 401 })
         }
 
         // Na razie kalendarz pokazuje zadania tylko zalogowanego użytkownika
         // Możemy to później rozbudować o filtr (jak na stronie /zadania)
         const tasks = await prisma.task.findMany({
             where: {
-                assignedToId: user.id,
+                assignedToId: user.id, // Używamy ID z bazy
             },
             include: {
                 assignedTo: { select: { kolor: true } } // Pobieramy kolor usera
@@ -39,13 +49,23 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: error.message }, { status: 500 })
     }
 }
-export async function POST(request: Request) {
-    const supabase = createClient()
 
+export async function POST(request: Request) {
     try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
+        // 1. Sprawdź sesję
+        const session = await auth()
+
+        if (!session?.user?.email) {
             return NextResponse.json({ error: 'Brak autoryzacji' }, { status: 401 })
+        }
+
+        // 2. Pobierz ID użytkownika z bazy (twórcy)
+        const user = await prisma.user.findUnique({
+            where: { email: session.user.email }
+        })
+
+        if (!user) {
+            return NextResponse.json({ error: 'Nie znaleziono użytkownika' }, { status: 401 })
         }
 
         const body = await request.json()
@@ -62,7 +82,7 @@ export async function POST(request: Request) {
                 termin: new Date(body.termin), // Przekształcamy string na datę
                 contactId: body.contactId,
                 assignedToId: body.assignedToId,
-                createdById: user.id, // Ustawiamy twórcę
+                createdById: user.id, // Ustawiamy twórcę (z bazy)
             }
         })
 

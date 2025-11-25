@@ -1,11 +1,14 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // Dodajemy binaryTargets, aby zbudować klienta pod Windows (dev) i Linux (prod)
+  // "rhel-openssl-1.0.x" lub "rhel-openssl-3.0.x" to standard dla CloudLinux (Seohost)
+  // "debian-openssl-1.1.x" to bezpieczny fallback
+  binaryTargets = ["native", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
-  provider = "mysql" // <--- ZMIANA 1: mysql zamiast postgresql
+  provider = "mysql"
   url      = env("DATABASE_URL")
-  // directUrl usuwamy, nie jest potrzebne
 }
 
 enum Role {
@@ -14,10 +17,11 @@ enum Role {
 }
 
 model User {
-  id    String  @id @default(uuid())
-  email String? @unique
-  role  Role    @default(USER)
-  kolor String?
+  id       String  @id @default(uuid())
+  email    String  @unique
+  password String
+  role     Role    @default(USER)
+  kolor    String?
 
   createdContacts  Contact[] @relation("CreatedBy")
   assignedContacts Contact[] @relation("AssignedTo")
@@ -36,31 +40,21 @@ model Contact {
   telefon String?
   zrodlo  String?
   branza  String?
+  opis    String? @db.Text
 
-  // ZMIANA 2: Dodajemy @db.Text do długich pól, bo MySQL ma limity
-  opis String? @db.Text
-
-  nazwaFirmy    String?
-  rodzajDzialki String?
-
-  potrzebaKlienta String? @db.Text
-
-  formaOpodatkowania String?
-  zobowiazania       Json?
-
-  majatekFirmy String? @db.Text
-
+  nazwaFirmy              String?
+  rodzajDzialki           String?
+  potrzebaKlienta         String? @db.Text
+  formaOpodatkowania      String?
+  zobowiazania            Json?
+  majatekFirmy            String? @db.Text
   czyZatrudniaPracownikow String?
   opoznieniaWPlatnosciach String?
-
-  planNaRozwoj String? @db.Text
-
-  stanCywilny           String?
-  rozdzielnoscMajatkowa String?
-
-  majatekPrywatny String? @db.Text
-
-  czyBralKredyt10Lat String?
+  planNaRozwoj            String? @db.Text
+  stanCywilny             String?
+  rozdzielnoscMajatkowa   String?
+  majatekPrywatny         String? @db.Text
+  czyBralKredyt10Lat      String?
 
   createdById  String
   createdBy    User   @relation("CreatedBy", fields: [createdById], references: [id])
@@ -76,12 +70,12 @@ model Task {
   updatedAt DateTime @updatedAt
 
   nazwa    String
-  opis     String?  @db.Text // Tu też warto dać Text
+  opis     String?  @db.Text
   termin   DateTime
   wykonane Boolean  @default(false)
 
   contactId String
-  contact   Contact @relation(fields: [contactId], references: [id])
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   createdById String
   createdBy   User   @relation("TaskCreatedBy", fields: [createdById], references: [id])

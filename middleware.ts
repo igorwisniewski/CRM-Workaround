@@ -1,72 +1,23 @@
-import { type NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
+import { auth } from "@/auth"
 
-export async function middleware(request: NextRequest) {
-    // Tworzymy odpowiedź, którą będziemy modyfikować (dodawać ciasteczka)
-    let response = NextResponse.next({
-        request: {
-            headers: request.headers,
-        },
-    })
+export default auth((req) => {
+    // Logika przekierowań jest opcjonalna tutaj, jeśli masz ją w auth.ts
+    // Ale dla pewności zostawmy podstawowe sprawdzenie
+    const isLoggedIn = !!req.auth
+    const { nextUrl } = req
 
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                getAll() {
-                    return request.cookies.getAll()
-                },
-                setAll(cookiesToSet) {
-                    cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
-                    response = NextResponse.next({
-                        request: {
-                            headers: request.headers,
-                        },
-                    })
-                    cookiesToSet.forEach(({ name, value, options }) =>
-                        response.cookies.set(name, value, options)
-                    )
-                },
-            },
-        }
-    )
-
-    // 1. Sprawdzamy użytkownika
-    const { data: { user } } = await supabase.auth.getUser()
-
-    const url = request.nextUrl.clone()
-    const pathname = url.pathname
-
-    // 2. Logika Przekierowań
-
-    // A. Jeśli user jest zalogowany i wchodzi na stronę logowania -> wyślij do /kontakty
-    if (user && pathname === '/') {
-        url.pathname = '/kontakty'
-        return NextResponse.redirect(url)
+    // Jeśli jesteś na stronie logowania i zalogowany -> przekieruj do kontaktów
+    if (isLoggedIn && nextUrl.pathname === '/') {
+        return Response.redirect(new URL('/kontakty', nextUrl))
     }
 
-    // B. Jeśli user NIE jest zalogowany i chce wejść w strefę prywatną -> wyślij do /
-    if (!user && (
-        pathname.startsWith('/kontakty') ||
-        pathname.startsWith('/zadania') ||
-        pathname.startsWith('/kalendarz') ||
-        pathname.startsWith('/ustawienia')
-    )) {
-        url.pathname = '/'
-        return NextResponse.redirect(url)
+    // Jeśli nie jesteś zalogowany i próbujesz wejść w chronione -> przekieruj do logowania
+    if (!isLoggedIn && nextUrl.pathname !== '/' && !nextUrl.pathname.startsWith('/api/auth')) {
+        return Response.redirect(new URL('/', nextUrl))
     }
+})
 
-    // 3. Zwracamy odpowiedź z odświeżonymi ciasteczkami
-    return response
-}
-
+// Wykluczamy pliki statyczne i API auth z middleware
 export const config = {
-    matcher: [
-        '/',
-        '/kontakty/:path*',
-        '/zadania/:path*',
-        '/kalendarz/:path*',
-        '/ustawienia/:path*',
-    ],
+    matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 }
