@@ -1,16 +1,15 @@
-// src/app/kontakty/[id]/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import AddTaskForm from '@/components/AddTaskForm'
-import { Contact, Task, User, Prisma } from '@prisma/client'
+import { Contact, Task, Prisma } from '@prisma/client'
 import DisplayField from '@/components/DisplayField'
 import DisplayZobowiazania from '@/components/DisplayZobowiazania'
 import DeleteTaskButton from '@/components/DeleteTaskButton';
 
-// Rozszerzony typ dla zadania (z danymi usera)
+// Rozszerzony typ dla zadania
 type TaskWithUser = Task & {
     assignedTo: {
         email: string | null;
@@ -18,12 +17,19 @@ type TaskWithUser = Task & {
     }
 }
 
-// Rozszerzony typ dla kontaktu, aby poprawnie obsłużyć JSON
+// Rozszerzony typ dla kontaktu
 type ContactWithDetails = Contact & {
     zobowiazania: Prisma.JsonValue | null;
+    procesy: Prisma.JsonValue | null; // Dodajemy typowanie dla procesów
 }
 
-// Funkcja do formatowania terminu
+// Typ pomocniczy dla pojedynczego procesu
+type ProcesItem = {
+    id: number;
+    nazwa: string;
+    kwota: string;
+}
+
 function formatTermin(date: Date) {
     return new Intl.DateTimeFormat('pl-PL', {
         dateStyle: 'short',
@@ -31,20 +37,25 @@ function formatTermin(date: Date) {
     }).format(new Date(date));
 }
 
-// === NOWE STYLE TAILWIND DLA SEKCJI ===
-// To jest styl, który dodaje spacje (margin-bottom: mb-6)
+// Formatowanie waluty
+function formatPLN(amount: number) {
+    return new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN' }).format(amount);
+}
+
 const sectionStyle = "bg-white border border-zinc-200 rounded-lg p-5 shadow-sm mb-6";
 
 export default function ContactDetailsPage() {
     const params = useParams()
     const contactId = params.id as string
 
-    // Stany do przechowywania danych
     const [contact, setContact] = useState<ContactWithDetails | null>(null)
     const [tasks, setTasks] = useState<TaskWithUser[]>([])
     const [users, setUsers] = useState<{ id: string, email: string | null }[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
+
+    // Stan dla procesów po sparsowaniu
+    const [parsedProcesy, setParsedProcesy] = useState<ProcesItem[]>([])
 
     useEffect(() => {
         if (!contactId) return;
@@ -64,6 +75,17 @@ export default function ContactDetailsPage() {
                 setTasks(data.tasks)
                 setUsers(data.users)
 
+                // Parsowanie procesów do wyświetlenia
+                if (data.contact.procesy) {
+                    try {
+                        const raw = data.contact.procesy;
+                        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                        if (Array.isArray(parsed)) {
+                            setParsedProcesy(parsed);
+                        }
+                    } catch (e) { console.error("Błąd parsowania procesów", e) }
+                }
+
             } catch (err: any) {
                 setError(err.message)
             } finally {
@@ -74,23 +96,14 @@ export default function ContactDetailsPage() {
         fetchData()
     }, [contactId])
 
-    if (loading) {
-        return <p className="text-center p-20">Ładowanie danych...</p>
-    }
-
-    if (error) {
-        return <p className="text-center p-20 text-red-600">Błąd: {error}</p>
-    }
-
-    if (!contact) {
-        return <p className="text-center p-20">Nie znaleziono kontaktu.</p>
-    }
+    if (loading) return <p className="text-center p-20">Ładowanie danych...</p>
+    if (error) return <p className="text-center p-20 text-red-600">Błąd: {error}</p>
+    if (!contact) return <p className="text-center p-20">Nie znaleziono kontaktu.</p>
 
     return (
-        // === GŁÓWNY LAYOUT (GRID) ===
         <div className="max-w-7xl mx-auto p-5 grid grid-cols-1 md:grid-cols-3 gap-8">
 
-            {/* === KOLUMNA LEWA (Szczegóły i Zadania) === */}
+            {/* === KOLUMNA LEWA (Szczegóły) === */}
             <div className="md:col-span-2">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-3xl font-bold text-zinc-800">{contact.imie}</h1>
@@ -104,7 +117,7 @@ export default function ContactDetailsPage() {
 
                 {/* --- SEKCJA: Dane Podstawowe --- */}
                 <div className={sectionStyle}>
-                    <h2 className="text-xl font-semibold text-zinc-700 mb-3">Dane Podstawowe</h2>
+                    <h2 className="text-xl font-semibold text-zinc-950 mb-3">Dane Podstawowe</h2>
                     <DisplayField label="Etap" value={contact.etap} />
                     <DisplayField label="Email" value={contact.email} />
                     <DisplayField label="Telefon" value={contact.telefon} />
@@ -113,9 +126,44 @@ export default function ContactDetailsPage() {
                     <DisplayField label="Opis" value={contact.opis} />
                 </div>
 
+                {/* --- NOWA SEKCJA: PROCESY I WARTOŚĆ --- */}
+                <div className={sectionStyle} style={{ borderLeft: '4px solid #2563eb' }}>
+                    <div className="flex justify-between items-center mb-3">
+                        <h2 className="text-xl font-semibold text-zinc-950">Procesy i Wartość</h2>
+                        <span className="text-lg font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+                            Suma: {formatPLN(contact.wartosc || 0)}
+                        </span>
+                    </div>
+
+                    {parsedProcesy.length > 0 ? (
+                        <div className="overflow-hidden rounded-md border border-zinc-200">
+                            <table className="min-w-full bg-white text-sm">
+                                <thead className="bg-zinc-50">
+                                <tr>
+                                    <th className="py-2 px-4 text-left font-medium text-zinc-500">Rodzaj</th>
+                                    <th className="py-2 px-4 text-right font-medium text-zinc-500">Kwota</th>
+                                </tr>
+                                </thead>
+                                <tbody className="divide-y divide-zinc-100">
+                                {parsedProcesy.map((p) => (
+                                    <tr key={p.id}>
+                                        <td className="py-2 px-4 text-zinc-800">{p.nazwa}</td>
+                                        <td className="py-2 px-4 text-right font-mono text-zinc-700">
+                                            {parseFloat(p.kwota).toLocaleString('pl-PL')} PLN
+                                        </td>
+                                    </tr>
+                                ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        <p className="text-zinc-400 italic text-sm">Brak aktywnych procesów.</p>
+                    )}
+                </div>
+
                 {/* --- SEKCJA: Dane Firmy --- */}
                 <div className={sectionStyle}>
-                    <h2 className="text-xl font-semibold text-zinc-700 mb-3">Dane Firmy</h2>
+                    <h2 className="text-xl font-semibold text-zinc-950 mb-3">Dane Firmy</h2>
                     <DisplayField label="Nazwa firmy" value={contact.nazwaFirmy} />
                     <DisplayField label="Rodzaj działki" value={contact.rodzajDzialki} />
                     <DisplayField label="Forma opodatkowania" value={contact.formaOpodatkowania} />
@@ -129,16 +177,24 @@ export default function ContactDetailsPage() {
 
                 {/* --- SEKCJA: Dane Prywatne --- */}
                 <div className={sectionStyle}>
-                    <h2 className="text-xl font-semibold text-zinc-700 mb-3">Dane Prywatne</h2>
+                    <h2 className="text-xl font-semibold text-zinc-950 mb-3">Dane Prywatne</h2>
                     <DisplayField label="Stan cywilny" value={contact.stanCywilny} />
                     <DisplayField label="Majątek prywatny" value={contact.majatekPrywatny} />
                     <DisplayField label="Rozdzielność majątkowa" value={contact.rozdzielnoscMajatkowa} />
                     <DisplayField label="Kredyt w ciągu 10 lat" value={contact.czyBralKredyt10Lat} />
+
+                    {/* NOWE POLE: OPINIA */}
+                    <div className="flex py-2 border-b border-zinc-100 last:border-0">
+                        <strong className="w-48 flex-shrink-0 text-zinc-900 font-medium">Wystawił opinię:</strong>
+                        <span className={`flex-1 font-medium ${contact.czyWystawilOpinie ? 'text-green-600' : 'text-zinc-900'}`}>
+                            {contact.czyWystawilOpinie ? '✅ TAK' : 'Nie'}
+                        </span>
+                    </div>
                 </div>
 
                 <hr className="my-6" />
 
-                {/* --- SEKCJA: Zadania (POPRAWIONA) --- */}
+                {/* --- SEKCJA: Zadania --- */}
                 <div>
                     <h2 className="text-2xl font-semibold text-zinc-800 mb-4">
                         Zadania ({tasks.length})
@@ -149,18 +205,13 @@ export default function ContactDetailsPage() {
                         )}
                         {tasks.map(task => (
                             <div key={task.id} className="bg-white border border-zinc-200 p-4 rounded-lg shadow-sm">
-                                {/* Górna część: Nazwa i Termin */}
                                 <div className="flex justify-between items-center mb-2">
                                     <strong className="text-lg font-semibold text-zinc-800">{task.nazwa}</strong>
-                                    <span className="font-bold text-sm text-zinc-700">
+                                    <span className="font-bold text-sm text-zinc-950">
                                         {formatTermin(task.termin)}
                                     </span>
                                 </div>
-
-                                {/* Opis */}
-                                <p className="text-zinc-600 my-2">{task.opis}</p>
-
-                                {/* Dolna część: Przypisany User i Przycisk Usuń */}
+                                <p className="text-zinc-950 my-2">{task.opis}</p>
                                 <div className="flex justify-between items-center mt-3">
                                     <span
                                         className="py-1 px-3 rounded-full text-xs font-medium text-white"
@@ -176,7 +227,7 @@ export default function ContactDetailsPage() {
                 </div>
             </div>
 
-            {/* === KOLUMNA PRAWA (Formularz) === */}
+            {/* === KOLUMNA PRAWA (Formularz dodawania zadań) === */}
             <div className="pt-0 md:pt-16">
                 <AddTaskForm contactId={contact.id} users={users} />
             </div>

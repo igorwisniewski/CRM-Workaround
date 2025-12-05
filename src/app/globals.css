@@ -1,2 +1,23 @@
 @import "tailwindcss";
 
+
+
+:root {
+    --foreground-rgb: 0, 0, 0;
+    --background-start-rgb: 214, 219, 220;
+    --background-end-rgb: 255, 255, 255;
+}
+
+body {
+    color: rgb(var(--foreground-rgb));
+    background: #f3f4f6;
+    color: #010101/* Jasne szare tło dla całej strony */
+}
+
+/* Przywracamy standardowe style dla FullCalendar (jeśli używasz) */
+.fc {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}

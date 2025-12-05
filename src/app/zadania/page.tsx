@@ -1,5 +1,3 @@
-// src/app/zadania/page.tsx
-
 // Konieczne dla dynamicznego wyszukiwania
 export const dynamic = 'force-dynamic'
 

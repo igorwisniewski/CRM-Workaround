@@ -14,7 +14,7 @@ interface Zobowiazania {
 const Row = ({ label, value }: { label: string, value: string | undefined | null }) => {
     if (!value || value.trim() === '') return null; // Nie renderuj pustych
     return (
-        <div className="flex py-2 border-b border-zinc-100 last:border-b-0">
+        <div className="flex py-2 border-b border-zinc-900 last:border-b-0">
             <strong className="w-48 flex-shrink-0 text-zinc-600 font-medium">{label}:</strong>
             <span className="flex-1 text-zinc-800 break-words">{value}</span>
         </div>
@@ -31,9 +31,9 @@ export default function DisplayZobowiazania({ data }: { data: Prisma.JsonValue |
 
     return (
         // Używamy border-t (border-top) aby oddzielić tę sekcję od reszty pól
-        <div className="mt-4 pt-4 border-t border-zinc-200">
+        <div className="mt-4 pt-4 border-t border-zinc-900">
             {/* Tytuł sekcji Zobowiązania */}
-            <h3 className="mb-1 text-base font-semibold text-zinc-600">Zobowiązania</h3>
+            <h3 className="mb-1 text-base font-semibold text-zinc-900">Zobowiązania</h3>
 
             <div className="flex flex-col">
                 <Row label="ZUS" value={zobowiazania.zus} />

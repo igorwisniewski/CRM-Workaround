@@ -1,18 +1,15 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { auth } from '@/auth' // <--- ZMIANA
+import { auth } from '@/auth'
 
 export async function POST(request: Request) {
     try {
-        // 1. Nowa autoryzacja
         const session = await auth()
 
-        // UWAGA: session.user.id jest dostępne, jeśli skonfigurowałeś callback w auth.ts
         if (!session?.user?.email) {
             return NextResponse.json({ error: 'Brak autoryzacji' }, { status: 401 })
         }
 
-        // Pobieramy usera z bazy, żeby mieć pewność co do ID i roli
         const user = await prisma.user.findUnique({
             where: { email: session.user.email }
         })
@@ -25,6 +22,7 @@ export async function POST(request: Request) {
 
         const nowyKontakt = await prisma.contact.create({
             data: {
+                // Podstawowe
                 imie: body.imie,
                 etap: body.etap,
                 email: body.email,
@@ -32,10 +30,13 @@ export async function POST(request: Request) {
                 zrodlo: body.zrodlo,
                 branza: body.branza,
                 opis: body.opis,
-                // Używamy ID z bazy
-                createdById: user.id,
-                assignedToId: user.id, // Domyślnie przypisz do twórcy
 
+                // Relacje
+                createdById: user.id,
+                // ZMIANA: Jeśli formularz przysłał assignedToId, użyj go. Jeśli nie - przypisz do twórcy.
+                assignedToId: body.assignedToId || user.id,
+
+                // Dane Firmowe
                 nazwaFirmy: body.nazwaFirmy,
                 rodzajDzialki: body.rodzajDzialki,
                 potrzebaKlienta: body.potrzebaKlienta,
@@ -44,18 +45,27 @@ export async function POST(request: Request) {
                 czyZatrudniaPracownikow: body.czyZatrudniaPracownikow,
                 opoznieniaWPlatnosciach: body.opoznieniaWPlatnosciach,
                 planNaRozwoj: body.planNaRozwoj,
+
+                // Dane Prywatne
                 stanCywilny: body.stanCywilny,
                 rozdzielnoscMajatkowa: body.rozdzielnoscMajatkowa,
                 majatekPrywatny: body.majatekPrywatny,
                 czyBralKredyt10Lat: body.czyBralKredyt10Lat,
+
+                // Zobowiązania (stare)
                 zobowiazania: body.zobowiazania,
+
+
+                procesy: body.procesy,             // Tablica JSON
+                wartosc: body.wartosc,             // Float/Int
+                czyWystawilOpinie: body.czyWystawilOpinie // Boolean
             },
         })
 
         return NextResponse.json(nowyKontakt, { status: 201 })
 
     } catch (error: any) {
-        console.error('BŁĄD:', error)
+        console.error('BŁĄD API:', error)
         return NextResponse.json({ error: error.message }, { status: 500 })
     }
 }

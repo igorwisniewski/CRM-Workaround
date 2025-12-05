@@ -3,7 +3,7 @@ generator client {
   // Dodajemy binaryTargets, aby zbudować klienta pod Windows (dev) i Linux (prod)
   // "rhel-openssl-1.0.x" lub "rhel-openssl-3.0.x" to standard dla CloudLinux (Seohost)
   // "debian-openssl-1.1.x" to bezpieczny fallback
-  binaryTargets = ["native", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+  binaryTargets = ["native", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x", "linux-musl-openssl-3.0.x", "debian-openssl-1.1.x"]
 }
 
 datasource db {
@@ -34,13 +34,16 @@ model Contact {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  imie    String
-  etap    String
-  email   String?
-  telefon String?
-  zrodlo  String?
-  branza  String?
-  opis    String? @db.Text
+  imie              String
+  etap              String
+  email             String?
+  telefon           String?
+  zrodlo            String?
+  branza            String?
+  opis              String? @db.Text
+  procesy           Json? // Tu będzie lista: [{nazwa: "X", kwota: 100}, ...]
+  wartosc           Float?  @default(0) // Suma kwot z procesów
+  czyWystawilOpinie Boolean @default(false) // Checkboxnpx prisma db push
 
   nazwaFirmy              String?
   rodzajDzialki           String?
